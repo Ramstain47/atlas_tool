@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { T, F } from "../../constants/theme";
 import { QBadge } from "../ui/QBadge";
 import { formatValue } from "../../utils/format";
@@ -11,12 +12,14 @@ export function DataGrid({
   setSelectedIds,
   multiSelectMode,
   setMultiSelectMode,
-  valueColumns,
   attrMap,
   computed,
   attrResults,
   setManualOverride,
 }) {
+  // 记录每个条目是否展开属性详情
+  const [expandedItems, setExpandedItems] = useState(new Set());
+
   const toggleGroup = (star) =>
     setCollapsedGroups((prev) => {
       const n = new Set(prev);
@@ -50,6 +53,64 @@ export function DataGrid({
     });
   };
 
+  const toggleItemExpand = (itemId) => {
+    setExpandedItems((prev) => {
+      const n = new Set(prev);
+      n.has(itemId) ? n.delete(itemId) : n.add(itemId);
+      return n;
+    });
+  };
+
+  // 展开所有条目
+  const expandAllItems = () => {
+    const allIds = new Set();
+    Object.values(groupedItems).forEach((items) => {
+      items.forEach((item) => {
+        if (item.attrs && item.attrs.length > 0) {
+          allIds.add(item.id);
+        }
+      });
+    });
+    setExpandedItems(allIds);
+  };
+
+  // 收起所有条目
+  const collapseAllItems = () => {
+    setExpandedItems(new Set());
+  };
+
+  // 格式化带符号的数值
+  const formatSignedValue = (value, valueType) => {
+    if (value === undefined || value === null || value === "") return "—";
+    const num = Number(value);
+    if (isNaN(num)) return "—";
+    const sign = num >= 0 ? "+" : "";
+    return sign + formatValue(num, valueType);
+  };
+
+  // 获取条目挂载的属性列表（带计算值）
+  const getItemAttrList = (item) => {
+    if (!item.attrs || item.attrs.length === 0) return [];
+    return item.attrs.map((attrKey) => {
+      const ad = attrMap[attrKey];
+      const result = computed && attrResults[attrKey];
+      const autoVal = result?.values?.[item.star]?.final;
+      const ok = `${item.id}_${attrKey}`;
+      const ov = sys.manualOverrides[ok];
+      const isManual = ov !== undefined && ov !== null;
+      const rawValue = isManual ? ov : autoVal;
+      return {
+        key: attrKey,
+        name: ad?.name || attrKey,
+        valueType: ad?.valueType || 1,
+        attrId: ad?.attrId,
+        value: rawValue,
+        isManual,
+        hasValue: computed && autoVal !== undefined,
+      };
+    });
+  };
+
   return (
     <div
       style={{
@@ -60,6 +121,7 @@ export function DataGrid({
         overflow: "hidden",
       }}
     >
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -153,11 +215,11 @@ export function DataGrid({
         </div>
       ) : (
         <div style={{ flex: 1, overflow: "auto" }}>
-          {/* Table header */}
+          {/* Table Header */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: `32px 74px 68px 38px 1fr ${valueColumns.map(() => "62px").join(" ")}`,
+              gridTemplateColumns: "32px 74px 68px 38px 1fr 60px",
               alignItems: "center",
               padding: "4px 10px",
               background: T.bg.surface,
@@ -176,12 +238,39 @@ export function DataGrid({
             <span>ID</span>
             <span>品质</span>
             <span>叠</span>
-            <span>属性</span>
-            {valueColumns.map((a) => (
-              <span key={a} style={{ textAlign: "center" }}>
-                {attrMap[a]?.name?.slice(0, 3) || a}
-              </span>
-            ))}
+            <span>挂载属性</span>
+            <span style={{ textAlign: "center", display: "flex", gap: 4, justifyContent: "center" }}>
+              <button
+                onClick={expandAllItems}
+                style={{
+                  padding: "1px 4px",
+                  fontSize: 7,
+                  border: `1px solid ${T.accent.blue}40`,
+                  background: `${T.accent.blue}10`,
+                  color: T.accent.blue,
+                  borderRadius: 2,
+                  cursor: "pointer",
+                }}
+                title="展开全部"
+              >
+                全展
+              </button>
+              <button
+                onClick={collapseAllItems}
+                style={{
+                  padding: "1px 4px",
+                  fontSize: 7,
+                  border: `1px solid ${T.border.default}`,
+                  background: "transparent",
+                  color: T.text.secondary,
+                  borderRadius: 2,
+                  cursor: "pointer",
+                }}
+                title="收起全部"
+              >
+                全收
+              </button>
+            </span>
           </div>
 
           {Object.entries(groupedItems).map(([star, items]) => {
@@ -191,6 +280,7 @@ export function DataGrid({
             const groupAllSel = items.length > 0 && items.every((it) => selectedIds.has(it.id));
             return (
               <div key={star}>
+                {/* Quality Group Header */}
                 <div
                   style={{
                     display: "flex",
@@ -229,109 +319,187 @@ export function DataGrid({
                     {String(star).padStart(2, "0")}xxx
                   </span>
                 </div>
+
+                {/* Items */}
                 {!isC &&
                   items.map((item, idx) => {
                     const isSel = selectedIds.has(item.id);
+                    const isExpanded = expandedItems.has(item.id);
+                    const itemAttrs = getItemAttrList(item);
+                    const hasAttrs = itemAttrs.length > 0;
+
                     return (
                       <div
                         key={item.id}
-                        onClick={(e) => toggleSelect(item.id, e)}
                         style={{
-                          display: "grid",
-                          gridTemplateColumns: `32px 74px 68px 38px 1fr ${valueColumns.map(() => "62px").join(" ")}`,
-                          alignItems: "center",
-                          padding: "3px 10px",
-                          background: isSel ? T.bg.active : idx % 2 === 0 ? T.bg.app : T.bg.surface,
                           borderBottom: `1px solid ${T.border.subtle}`,
-                          fontSize: 10,
-                          cursor: "pointer",
+                          background: isSel ? T.bg.active : idx % 2 === 0 ? T.bg.app : T.bg.surface,
                         }}
                       >
-                        <span onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={isSel}
-                            onChange={(e) => toggleSelect(item.id, e)}
-                            style={{
-                              accentColor: multiSelectMode ? T.accent.yellow : T.accent.blue,
-                              width: 11,
-                              height: 11,
-                              cursor: "pointer",
-                            }}
-                          />
-                        </span>
-                        <span style={{ fontFamily: F.mono, color: T.text.secondary, fontSize: 9 }}>{item.id}</span>
-                        <span>
-                          <QBadge star={item.star} compact />
-                        </span>
-                        <span style={{ fontFamily: F.mono, color: T.text.secondary, textAlign: "center", fontSize: 10 }}>
-                          {item.maxStack}
-                        </span>
-                        <span style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-                          {(item.attrs || []).length === 0 && <span style={{ color: T.text.muted, fontSize: 8 }}>未挂载</span>}
-                          {(item.attrs || []).map((a) => (
-                            <span
-                              key={a}
+                        {/* Item Row */}
+                        <div
+                          onClick={(e) => toggleSelect(item.id, e)}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "32px 74px 68px 38px 1fr 60px",
+                            alignItems: "center",
+                            padding: "4px 10px",
+                            fontSize: 10,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <span onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isSel}
+                              onChange={(e) => toggleSelect(item.id, e)}
                               style={{
-                                padding: "0 3px",
-                                borderRadius: 2,
-                                fontSize: 8,
-                                fontWeight: 500,
-                                background: `${T.accent.blue}15`,
-                                color: T.accent.blue,
-                                border: `1px solid ${T.accent.blue}30`,
+                                accentColor: multiSelectMode ? T.accent.yellow : T.accent.blue,
+                                width: 11,
+                                height: 11,
+                                cursor: "pointer",
                               }}
-                            >
-                              {attrMap[a]?.name?.slice(0, 3) || a}
-                            </span>
-                          ))}
-                        </span>
-                        {valueColumns.map((attr) => {
-                          if (!(item.attrs || []).includes(attr))
-                            return (
-                              <span key={attr} style={{ color: T.text.muted, fontSize: 9, textAlign: "center" }}>
-                                —
-                              </span>
-                            );
-                          const ad = attrMap[attr];
-                          const autoVal = computed && attrResults[attr]?.values?.[item.star]?.final;
-                          const ok = `${item.id}_${attr}`;
-                          const ov = sys.manualOverrides[ok];
-                          const isManual = ov !== undefined && ov !== null;
-                          const rawDisplay = isManual ? ov : autoVal || "—";
-                          const formatted = formatValue(rawDisplay, ad?.valueType || 1);
-                          return (
-                            <div key={attr} style={{ textAlign: "center" }}>
-                              {computed ? (
-                                <div style={{ position: "relative" }}>
-                                  <input
-                                    value={isManual ? ov : autoVal || ""}
-                                    onChange={(e) => setManualOverride(item.id, attr, e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
+                            />
+                          </span>
+                          <span style={{ fontFamily: F.mono, color: T.text.secondary, fontSize: 9 }}>{item.id}</span>
+                          <span>
+                            <QBadge star={item.star} compact />
+                          </span>
+                          <span style={{ fontFamily: F.mono, color: T.text.secondary, textAlign: "center", fontSize: 10 }}>
+                            {item.maxStack}
+                          </span>
+
+                          {/* 属性摘要（仅显示名称） */}
+                          <span style={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
+                            {!hasAttrs ? (
+                              <span style={{ color: T.text.muted, fontSize: 8 }}>未挂载</span>
+                            ) : (
+                              itemAttrs.slice(0, 2).map((a) => (
+                                <span
+                                  key={a.key}
+                                  style={{
+                                    padding: "1px 6px",
+                                    borderRadius: 3,
+                                    fontSize: 9,
+                                    fontWeight: 500,
+                                    background: `${T.accent.blue}15`,
+                                    color: T.accent.blue,
+                                    border: `1px solid ${T.accent.blue}30`,
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {a.name}
+                                  {a.hasValue && (
+                                    <span style={{ marginLeft: 4, color: T.accent.green, fontWeight: 600 }}>
+                                      {formatSignedValue(a.value, a.valueType)}
+                                    </span>
+                                  )}
+                                </span>
+                              ))
+                            )}
+                            {itemAttrs.length > 2 && (
+                              <span style={{ fontSize: 8, color: T.text.muted }}>+{itemAttrs.length - 2}</span>
+                            )}
+                          </span>
+
+                          {/* 展开按钮 */}
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleItemExpand(item.id);
+                            }}
+                            style={{
+                              textAlign: "center",
+                              fontSize: 10,
+                              color: hasAttrs ? T.accent.blue : T.text.muted,
+                              cursor: hasAttrs ? "pointer" : "default",
+                              transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                              transition: "transform 0.15s",
+                            }}
+                          >
+                            {hasAttrs ? "▼" : "—"}
+                          </span>
+                        </div>
+
+                        {/* 展开的属性详情 */}
+                        {isExpanded && hasAttrs && (
+                          <div
+                            style={{
+                              padding: "6px 10px 8px 44px",
+                              background: isSel ? `${T.accent.blue}05` : T.bg.elevated,
+                              borderTop: `1px dashed ${T.border.subtle}`,
+                            }}
+                          >
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              {itemAttrs.map((a) => (
+                                <div
+                                  key={a.key}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    fontSize: 10,
+                                  }}
+                                >
+                                  <span
                                     style={{
-                                      width: "100%",
-                                      padding: "1px 2px",
-                                      background: isManual ? `${T.accent.yellow}12` : "transparent",
-                                      border: `1px solid ${isManual ? T.accent.yellow + "40" : "transparent"}`,
-                                      borderRadius: 2,
-                                      color: isManual ? T.accent.yellow : T.accent.green,
-                                      fontSize: 10,
-                                      fontFamily: F.mono,
-                                      fontWeight: 600,
-                                      textAlign: "center",
-                                      outline: "none",
-                                      boxSizing: "border-box",
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: "50%",
+                                      background: T.accent.blue,
+                                      flexShrink: 0,
                                     }}
-                                    title={`原始值: ${rawDisplay} → 显示: ${formatted}`}
                                   />
-                                  {ad?.valueType > 1 && <div style={{ fontSize: 7, color: T.text.muted, marginTop: -1 }}>{formatted}</div>}
+                                  <span style={{ minWidth: 70, color: T.text.secondary }}>{a.name}</span>
+                                  <span style={{ fontSize: 8, color: T.text.muted, fontFamily: F.mono }}>ID:{a.attrId}</span>
+
+                                  {/* 数值显示/编辑 */}
+                                  {computed && a.hasValue ? (
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                                      <span
+                                        style={{
+                                          fontSize: 9,
+                                          color: T.text.muted,
+                                          padding: "0 4px",
+                                          background: T.bg.input,
+                                          borderRadius: 2,
+                                        }}
+                                      >
+                                        {a.valueType === 2 ? "百分比" : a.valueType === 3 ? "小数" : "整数"}
+                                      </span>
+                                      <input
+                                        value={a.isManual ? a.value : a.value || ""}
+                                        onChange={(e) => setManualOverride(item.id, a.key, e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{
+                                          width: 70,
+                                          padding: "2px 4px",
+                                          background: a.isManual ? `${T.accent.yellow}12` : T.bg.input,
+                                          border: `1px solid ${a.isManual ? T.accent.yellow + "40" : T.border.subtle}`,
+                                          borderRadius: 3,
+                                          color: a.isManual ? T.accent.yellow : T.accent.green,
+                                          fontSize: 10,
+                                          fontFamily: F.mono,
+                                          fontWeight: 600,
+                                          textAlign: "center",
+                                          outline: "none",
+                                        }}
+                                        title={a.isManual ? "手动覆盖值" : "自动计算值"}
+                                      />
+                                      <span style={{ fontSize: 9, color: T.text.muted, minWidth: 50 }}>
+                                        {formatValue(a.value, a.valueType)}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span style={{ marginLeft: "auto", fontSize: 9, color: T.text.muted }}>
+                                      {computed ? "未计算" : "—"}
+                                    </span>
+                                  )}
                                 </div>
-                              ) : (
-                                <span style={{ color: T.text.muted, fontSize: 9 }}>—</span>
-                              )}
+                              ))}
                             </div>
-                          );
-                        })}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

@@ -306,7 +306,6 @@ export default function App() {
   } = useSystems(showToast, setComputedUI, initialData);
 
   // ── Computed Values ──
-  const valueColumns = useMemo(() => usedAttrs.slice(0, 4), [usedAttrs]);
 
   const availableForSelection = useMemo(() => {
     const poolKeys = new Set((activeSystem?.attrPool || []).map((a) => a.key));
@@ -548,7 +547,7 @@ export default function App() {
           setSelectedIds={setSelectedIds}
           multiSelectMode={multiSelectMode}
           setMultiSelectMode={setMultiSelectMode}
-          valueColumns={valueColumns}
+
           attrMap={attrMap}
           computed={computed}
           attrResults={attrResults}
