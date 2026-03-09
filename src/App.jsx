@@ -434,7 +434,7 @@ export default function App() {
           const ov = s.manualOverrides[ok];
           const av = r?.values?.[item.star]?.final || 0;
           const val = ov !== undefined && ov !== null ? ov : av;
-          if (val > 0 || (item.attrs || []).includes(attrKey)) rewards.push(`${ad?.attrId || attrKey},${val}`);
+          if (val > 0 || (item.attrs || []).includes(attrKey)) rewards.push(`1,${ad?.attrId || attrKey},${val}`);
         }
         rows.push([item.id, "", s.name, item.star, item.maxStack, rewards.join(";")]);
       }
