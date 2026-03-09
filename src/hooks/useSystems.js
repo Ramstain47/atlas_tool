@@ -1,17 +1,21 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { loadSystems, saveSystems } from "../utils/storage";
+import { saveSystems } from "../utils/storage";
 import { createDefaultSystem } from "../constants/app";
 import { computeAttribute } from "../utils/compute";
 import { generateItems, generatePreviewIds } from "../utils/format";
 
-export function useSystems(showToast, setComputed) {
+export function useSystems(showToast, setComputed, initialData = null) {
   const [systems, setSystems] = useState(() => {
-    const saved = loadSystems();
-    if (saved) return saved;
-    return [{ ...createDefaultSystem("摸鱼宝库", "101"), id: "sys1" }];
+    // 如果提供了初始数据（从存档加载），使用它
+    if (initialData?.systems) return initialData.systems;
+    // 否则返回空数组，等待用户选择存档
+    return [];
   });
 
-  const [activeSystemId, setActiveSystemId] = useState("sys1");
+  const [activeSystemId, setActiveSystemId] = useState(() => {
+    if (initialData?.systems?.[0]?.id) return initialData.systems[0].id;
+    return "";
+  });
   const [computed, setComputedState] = useState(false);
 
   // Persist to localStorage
@@ -20,7 +24,7 @@ export function useSystems(showToast, setComputed) {
   }, [systems]);
 
   const activeSystem = useMemo(
-    () => systems.find((s) => s.id === activeSystemId) || systems[0],
+    () => systems.find((s) => s.id === activeSystemId) || systems[0] || { qualities: [], items: [], attrPool: [], attrConfigs: {}, manualOverrides: {}, generated: false },
     [systems, activeSystemId]
   );
 
@@ -401,10 +405,10 @@ export function useSystems(showToast, setComputed) {
 
   const groupedItems = useMemo(() => {
     const g = {};
-    activeSystem.qualities.forEach((q) => {
+    (activeSystem?.qualities || []).forEach((q) => {
       g[q.star] = [];
     });
-    (activeSystem.items || []).forEach((it) => {
+    (activeSystem?.items || []).forEach((it) => {
       if (g[it.star]) g[it.star].push(it);
     });
     return g;

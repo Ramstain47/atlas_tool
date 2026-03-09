@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { createDefaultSystem } from "./constants/app";
 import { T, F } from "./constants/theme";
 import { useToast } from "./hooks/useToast";
 import { useGlobalAttrs } from "./hooks/useGlobalAttrs";
@@ -24,6 +25,218 @@ globalStyles.textContent = `* { margin: 0; padding: 0; box-sizing: border-box; }
 document.head.appendChild(globalStyles);
 
 // ══════════════════════════════════════════════════════════
+//  启动存档选择界面
+// ══════════════════════════════════════════════════════════
+function BootScreen({ saveSlots, maxSlots, getSlotInfo, onLoad, onNew, onLoadAutoSave }) {
+  const hasAnySave = saveSlots.some((s) => s !== null);
+  const hasAutoSave = localStorage.getItem("codex_systems") !== null;
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100vh",
+        background: T.bg.app,
+        color: T.text.primary,
+        fontFamily: F.sans,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ marginBottom: 32, textAlign: "center" }}>
+        <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>📚 图鉴数值配置工具</div>
+        <div style={{ fontSize: 12, color: T.text.secondary }}>选择存档开始或创建新的配置</div>
+      </div>
+
+      {/* 快捷操作区域 */}
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          marginBottom: 20,
+          justifyContent: "center",
+        }}
+      >
+        {/* 新建配置选项 */}
+        <div
+          onClick={onNew}
+          style={{
+            padding: "14px 32px",
+            background: `${T.accent.green}10`,
+            borderRadius: 8,
+            border: `2px dashed ${T.accent.green}50`,
+            cursor: "pointer",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: 120,
+            transition: "all 0.2s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = `${T.accent.green}20`;
+            e.currentTarget.style.borderColor = T.accent.green;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = `${T.accent.green}10`;
+            e.currentTarget.style.borderColor = `${T.accent.green}50`;
+          }}
+        >
+          <div style={{ fontSize: 20, marginBottom: 4 }}>+</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: T.accent.green }}>新建配置</div>
+          <div style={{ fontSize: 8, color: T.text.muted, marginTop: 2 }}>从默认模板开始</div>
+        </div>
+
+        {/* 自动保存恢复 */}
+        {hasAutoSave && (
+          <div
+            onClick={onLoadAutoSave}
+            style={{
+              padding: "14px 32px",
+              background: `${T.accent.yellow}10`,
+              borderRadius: 8,
+              border: `2px dashed ${T.accent.yellow}50`,
+              cursor: "pointer",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              minWidth: 120,
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = `${T.accent.yellow}20`;
+              e.currentTarget.style.borderColor = T.accent.yellow;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = `${T.accent.yellow}10`;
+              e.currentTarget.style.borderColor = `${T.accent.yellow}50`;
+            }}
+          >
+            <div style={{ fontSize: 20, marginBottom: 4 }}>💾</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: T.accent.yellow }}>自动保存</div>
+            <div style={{ fontSize: 8, color: T.text.muted, marginTop: 2 }}>恢复上次数据</div>
+          </div>
+        )}
+      </div>
+
+      {/* 存档槽位网格 */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(5, 1fr)",
+          gap: 10,
+          maxWidth: 700,
+          width: "90%",
+          maxHeight: 380,
+          overflow: "auto",
+          padding: 4,
+        }}
+      >
+        {Array.from({ length: maxSlots }, (_, i) => {
+          const slot = saveSlots[i];
+          const info = getSlotInfo(slot);
+          const isEmpty = !slot;
+
+          return (
+            <div
+              key={i}
+              onClick={() => !isEmpty && onLoad(i)}
+              style={{
+                padding: 12,
+                background: isEmpty ? T.bg.input : T.bg.elevated,
+                borderRadius: 8,
+                border: `2px solid ${isEmpty ? T.border.subtle : T.accent.blue + "50"}`,
+                cursor: isEmpty ? "not-allowed" : "pointer",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                minHeight: 100,
+                opacity: isEmpty ? 0.5 : 1,
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                if (!isEmpty) {
+                  e.currentTarget.style.borderColor = T.accent.blue;
+                  e.currentTarget.style.background = `${T.accent.blue}10`;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isEmpty) {
+                  e.currentTarget.style.borderColor = T.accent.blue + "50";
+                  e.currentTarget.style.background = T.bg.elevated;
+                }
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: isEmpty ? T.text.muted : T.accent.blue }}>
+                  存档 {i + 1}
+                </span>
+                {isEmpty && (
+                  <span
+                    style={{
+                      fontSize: 8,
+                      color: T.text.muted,
+                      padding: "1px 4px",
+                      background: T.bg.surface,
+                      borderRadius: 2,
+                    }}
+                  >
+                    空
+                  </span>
+                )}
+              </div>
+
+              {isEmpty ? (
+                <div style={{ textAlign: "center", padding: "8px 0" }}>
+                  <span style={{ fontSize: 9, color: T.text.muted }}>无数据</span>
+                </div>
+              ) : (
+                <div style={{ fontSize: 9, color: T.text.secondary }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                    <span>系统:</span>
+                    <span style={{ color: T.text.primary }}>{slot.systems?.length || 0}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                    <span>图鉴:</span>
+                    <span style={{ color: T.text.primary }}>{info?.totalItems || 0}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>属性:</span>
+                    <span style={{ color: T.text.primary }}>{info?.totalAttrs || 0}</span>
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 6,
+                      paddingTop: 4,
+                      borderTop: `1px solid ${T.border.subtle}`,
+                      color: T.text.muted,
+                      fontSize: 8,
+                      textAlign: "center",
+                    }}
+                  >
+                    {info?.time}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {!hasAnySave && !hasAutoSave && (
+        <div style={{ marginTop: 24, fontSize: 10, color: T.text.muted, textAlign: "center" }}>
+          欢迎使用！点击「新建配置」开始使用，或从自动保存恢复数据
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
 //  主应用
 // ══════════════════════════════════════════════════════════
 export default function App() {
@@ -31,6 +244,10 @@ export default function App() {
   const { toast, showToast } = useToast();
   const { globalAttrs, setGlobalAttrs } = useGlobalAttrs(showToast);
   const { saveSlots, maxSlots, handleSaveToSlot, handleLoadFromSlot, handleDeleteSlot, getSlotInfo } = useSaveSlots(showToast);
+
+  // ── Boot State ──
+  const [booted, setBooted] = useState(false);
+  const [initialData, setInitialData] = useState(null);
 
   // ── UI State ──
   const [configCollapsed, setConfigCollapsed] = useState(false);
@@ -86,15 +303,15 @@ export default function App() {
     computed,
     handleCompute,
     groupedItems,
-  } = useSystems(showToast, setComputedUI);
+  } = useSystems(showToast, setComputedUI, initialData);
 
   // ── Computed Values ──
   const valueColumns = useMemo(() => usedAttrs.slice(0, 4), [usedAttrs]);
 
   const availableForSelection = useMemo(() => {
-    const poolKeys = new Set(activeSystem.attrPool.map((a) => a.key));
+    const poolKeys = new Set((activeSystem?.attrPool || []).map((a) => a.key));
     return globalAttrs.filter((a) => !poolKeys.has(a.key));
-  }, [globalAttrs, activeSystem.attrPool]);
+  }, [globalAttrs, activeSystem?.attrPool]);
 
   // ── Event Handlers ──
   const handleAddSystem = useCallback(
@@ -117,6 +334,23 @@ export default function App() {
     [addAttrToPool]
   );
 
+  // 批量添加属性到属性池
+  const handleMountMultipleAttrs = useCallback(
+    (attrs) => {
+      let addedCount = 0;
+      attrs.forEach((attr) => {
+        if (addAttrToPool(attr)) {
+          addedCount++;
+        }
+      });
+      if (addedCount > 0) {
+        showToast(`已添加 ${addedCount} 个属性到属性池`, "green");
+        setShowSelectFromManager(false);
+      }
+    },
+    [addAttrToPool, showToast]
+  );
+
   const handleSaveSlot = useCallback(
     (slotIndex) => {
       handleSaveToSlot(systems, globalAttrs, slotIndex);
@@ -130,17 +364,50 @@ export default function App() {
       if (data) {
         if (data.systems && Array.isArray(data.systems)) {
           setSystems(data.systems);
-          setActiveSystemId(data.systems[0]?.id || "sys1");
+          setActiveSystemId(data.systems[0]?.id || "");
         }
         if (data.globalAttrs && Array.isArray(data.globalAttrs)) {
           setGlobalAttrs(data.globalAttrs);
         }
         setComputedUI(false);
-        setShowLoadManager(false);
+        // 如果是在启动界面，标记为已启动
+        if (!booted) {
+          setBooted(true);
+        } else {
+          // 如果在应用内，关闭读档管理器
+          setShowLoadManager(false);
+        }
       }
     },
-    [handleLoadFromSlot, setSystems, setGlobalAttrs, setActiveSystemId]
+    [handleLoadFromSlot, setSystems, setGlobalAttrs, setActiveSystemId, booted]
   );
+
+  // 新建配置
+  const handleNewConfig = useCallback(() => {
+    setInitialData({
+      systems: [{ ...createDefaultSystem("摸鱼宝库", "101"), id: "sys1" }],
+      globalAttrs: [...globalAttrs],
+    });
+    setBooted(true);
+    showToast("已创建新配置", "green");
+  }, [globalAttrs, showToast]);
+
+  // 从自动保存恢复
+  const handleLoadAutoSave = useCallback(() => {
+    const saved = localStorage.getItem("codex_systems");
+    const savedAttrs = localStorage.getItem("codex_global_attrs");
+    if (saved) {
+      try {
+        const systems = JSON.parse(saved);
+        const globalAttrs = savedAttrs ? JSON.parse(savedAttrs) : [];
+        setInitialData({ systems, globalAttrs });
+        setBooted(true);
+        showToast("已从自动保存恢复", "green");
+      } catch {
+        showToast("自动保存数据损坏", "red");
+      }
+    }
+  }, [showToast]);
 
   // ── Generate Handlers ──
   const handleGenerateClick = useCallback(() => {
@@ -188,6 +455,22 @@ export default function App() {
   // ══════════════════════
   //  RENDER
   // ══════════════════════
+
+  // 启动界面
+  if (!booted) {
+    return (
+      <BootScreen
+        saveSlots={saveSlots}
+        maxSlots={maxSlots}
+        getSlotInfo={getSlotInfo}
+        onLoad={handleLoadSlot}
+        onNew={handleNewConfig}
+        onLoadAutoSave={handleLoadAutoSave}
+      />
+    );
+  }
+
+  // 主应用界面
   return (
     <div
       style={{
@@ -316,10 +599,12 @@ export default function App() {
       <ExportModal open={showExportConfirm} onClose={() => setShowExportConfirm(false)} systems={systems} onExport={handleExport} />
 
       <SelectAttrModal
+        key={showSelectFromManager ? "open" : "closed"}
         open={showSelectFromManager}
         onClose={() => setShowSelectFromManager(false)}
         availableAttrs={availableForSelection}
         onSelect={handleMountAttr}
+        onSelectMultiple={handleMountMultipleAttrs}
       />
 
       <AttrManagerModal
