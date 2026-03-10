@@ -6,6 +6,7 @@ import { useState, useMemo } from "react";
 import { Modal } from "../ui/Modal";
 import { Inp } from "../ui/Inp";
 import { T, F } from "../../constants/theme";
+import { ATTR_COLORS } from "../../constants/app";
 import * as XLSX from "xlsx";
 
 const VALUE_TYPE_LABELS = { 1: "整数", 2: "百分比", 3: "小数" };
@@ -13,7 +14,8 @@ const VALUE_TYPE_LABELS = { 1: "整数", 2: "百分比", 3: "小数" };
 export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, showToast, onDragStart }) {
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ key: "", name: "", attrId: "", valueType: "1" });
+  const [form, setForm] = useState({ key: "", name: "", attrId: "", valueType: "1", color: ATTR_COLORS[0] });
+  const [colorPicking, setColorPicking] = useState(null); // attr.key currently picking color
 
   const filtered = useMemo(() => {
     if (!search.trim()) return globalAttrs;
@@ -60,7 +62,8 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
             return;
           }
 
-          newAttrs.push({ key, attrId, name: String(name).trim(), valueType });
+          const color = row["color"] || row["颜色"] || ATTR_COLORS[0];
+          newAttrs.push({ key, attrId, name: String(name).trim(), valueType, color });
         });
 
         if (newAttrs.length > 0) {
@@ -87,6 +90,7 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
       name: a.name,
       id: a.attrId,
       attr_type: a.valueType,
+      color: a.color || ATTR_COLORS[0],
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -114,8 +118,8 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
       return;
     }
 
-    setGlobalAttrs((prev) => [...prev, { key, attrId, name, valueType: Number(form.valueType) || 1 }]);
-    setForm({ key: "", name: "", attrId: "", valueType: "1" });
+    setGlobalAttrs((prev) => [...prev, { key, attrId, name, valueType: Number(form.valueType) || 1, color: form.color || ATTR_COLORS[0] }]);
+    setForm({ key: "", name: "", attrId: "", valueType: "1", color: ATTR_COLORS[0] });
     showToast("属性已添加到管理器", "green");
   };
 
@@ -136,10 +140,10 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
     }
 
     setGlobalAttrs((prev) =>
-      prev.map((a) => (a.key === editing ? { ...a, name, attrId, valueType: Number(form.valueType) || 1 } : a))
+      prev.map((a) => (a.key === editing ? { ...a, name, attrId, valueType: Number(form.valueType) || 1, color: form.color || ATTR_COLORS[0] } : a))
     );
     setEditing(null);
-    setForm({ key: "", name: "", attrId: "", valueType: "1" });
+    setForm({ key: "", name: "", attrId: "", valueType: "1", color: ATTR_COLORS[0] });
     showToast("属性已更新", "green");
   };
 
@@ -155,12 +159,13 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
       name: attr.name,
       attrId: String(attr.attrId),
       valueType: String(attr.valueType),
+      color: attr.color || ATTR_COLORS[0],
     });
   };
 
   const cancelEdit = () => {
     setEditing(null);
-    setForm({ key: "", name: "", attrId: "", valueType: "1" });
+    setForm({ key: "", name: "", attrId: "", valueType: "1", color: ATTR_COLORS[0] });
   };
 
   // 拖拽开始
@@ -312,12 +317,36 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
                 添加
               </button>
             ) : (
-              <div style={{ display: "flex", gap: 4, alignSelf: "flex-end" }}>
+              <div />
+            )}
+          </div>
+          {/* 颜色选择器 */}
+          <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6 }}>
+            <span style={{ fontSize: 8, color: T.text.muted, textTransform: "uppercase", letterSpacing: 0.7, flexShrink: 0 }}>颜色</span>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {ATTR_COLORS.map((c) => (
+                <span
+                  key={c}
+                  onClick={() => setForm((p) => ({ ...p, color: c }))}
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: "50%",
+                    background: c,
+                    cursor: "pointer",
+                    border: form.color === c ? "2px solid #fff" : "2px solid transparent",
+                    boxShadow: form.color === c ? `0 0 0 1px ${c}` : "none",
+                    transition: "border 0.1s, box-shadow 0.1s",
+                  }}
+                />
+              ))}
+            </div>
+            {editing && (
+              <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
                 <button
                   onClick={handleUpdate}
                   style={{
-                    flex: 1,
-                    padding: "5px 8px",
+                    padding: "4px 10px",
                     borderRadius: 4,
                     border: "none",
                     background: T.accent.blue,
@@ -326,13 +355,11 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
                     fontWeight: 600,
                     cursor: "pointer",
                   }}
-                >
-                  保存
-                </button>
+                >保存</button>
                 <button
                   onClick={cancelEdit}
                   style={{
-                    padding: "5px 8px",
+                    padding: "4px 10px",
                     borderRadius: 4,
                     border: `1px solid ${T.border.default}`,
                     background: "transparent",
@@ -340,9 +367,7 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
                     fontSize: 10,
                     cursor: "pointer",
                   }}
-                >
-                  取消
-                </button>
+                >取消</button>
               </div>
             )}
           </div>
@@ -354,7 +379,7 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "20px 80px 1fr 50px 50px 70px",
+              gridTemplateColumns: "20px 16px 80px 1fr 50px 50px 70px",
               gap: 6,
               padding: "4px 8px",
               background: T.bg.surface,
@@ -366,12 +391,14 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
             }}
           >
             <span></span>
+            <span></span>
             <span>Key</span>
             <span>名称</span>
             <span>ID</span>
             <span>类型</span>
             <span style={{ textAlign: "center" }}>操作</span>
           </div>
+
 
           {filtered.length === 0 ? (
             <div style={{ padding: 20, textAlign: "center", color: T.text.muted, fontSize: 11 }}>
@@ -382,19 +409,15 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
               {filtered.map((attr) => (
                 <div
                   key={attr.key}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, attr)}
-                  onDragEnd={handleDragEnd}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "20px 80px 1fr 50px 50px 70px",
+                    gridTemplateColumns: "20px 16px 80px 1fr 50px 50px 70px",
                     gap: 6,
                     alignItems: "center",
                     padding: "4px 8px",
                     background: T.bg.input,
                     borderRadius: 3,
                     fontSize: 10,
-                    cursor: "grab",
                     transition: "background 0.15s",
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = T.bg.hover; }}
@@ -402,6 +425,9 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
                 >
                   {/* 拖拽手柄 */}
                   <span
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, attr)}
+                    onDragEnd={handleDragEnd}
                     style={{
                       color: T.text.muted,
                       fontSize: 11,
@@ -412,6 +438,47 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
                   >
                     ⋮⋮
                   </span>
+                  <div style={{ position: "relative", width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span
+                      onClick={(e) => { e.stopPropagation(); setColorPicking(colorPicking === attr.key ? null : attr.key); }}
+                      style={{
+                        width: 12, height: 12, borderRadius: "50%",
+                        background: attr.color || ATTR_COLORS[0], flexShrink: 0,
+                        cursor: "pointer", border: "2px solid transparent",
+                        transition: "border 0.1s",
+                        ...(colorPicking === attr.key ? { border: "2px solid #fff" } : {}),
+                      }}
+                      title="点击修改颜色"
+                    />
+                    {colorPicking === attr.key && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          position: "absolute", top: 20, left: 0, zIndex: 100,
+                          background: T.bg.elevated, border: `1px solid ${T.border.default}`,
+                          borderRadius: 6, padding: 6,
+                          display: "flex", gap: 4, flexWrap: "wrap", width: 140,
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+                        }}
+                      >
+                        {ATTR_COLORS.map((c) => (
+                          <span
+                            key={c}
+                            onClick={() => {
+                              setGlobalAttrs((prev) => prev.map((a) => a.key === attr.key ? { ...a, color: c } : a));
+                              setColorPicking(null);
+                            }}
+                            style={{
+                              width: 16, height: 16, borderRadius: "50%", background: c, cursor: "pointer",
+                              border: (attr.color || ATTR_COLORS[0]) === c ? "2px solid #fff" : "2px solid transparent",
+                              boxShadow: (attr.color || ATTR_COLORS[0]) === c ? `0 0 0 1px ${c}` : "none",
+                              transition: "border 0.1s",
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <span style={{ fontFamily: F.mono, color: T.text.secondary, fontSize: 9, overflow: "hidden", textOverflow: "ellipsis" }}>
                     {attr.key}
                   </span>

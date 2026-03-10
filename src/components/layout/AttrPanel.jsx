@@ -1,3 +1,4 @@
+import { useState, useRef, useCallback } from "react";
 import { T, F } from "../../constants/theme";
 import { QBadge } from "../ui/QBadge";
 import { Pill } from "../ui/Pill";
@@ -15,6 +16,7 @@ export function AttrPanel({
   mountAttrToItems,
   unmountAttrFromItems,
   removeFromPool,
+  reorderAttrPool,
   attrResults,
   actualTotals,
   computed,
@@ -26,6 +28,31 @@ export function AttrPanel({
   setMultiSelectMode,
   onDragStart,
 }) {
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+  const handleRef = useRef(false);
+  const scrollRef = useRef(null);
+
+  const scrollToAttrConfig = useCallback((attrKey) => {
+    const el = document.getElementById(`attr-config-${attrKey}`);
+    if (el && scrollRef.current) {
+      const container = scrollRef.current;
+      const targetTop = el.offsetTop - container.offsetTop;
+      const start = container.scrollTop;
+      const diff = targetTop - start;
+      const duration = 200;
+      let startTime = null;
+      const step = (ts) => {
+        if (!startTime) startTime = ts;
+        const progress = Math.min((ts - startTime) / duration, 1);
+        const ease = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+        container.scrollTop = start + diff * ease;
+        if (progress < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+  }, []);
+
   return (
     <div style={{ flex: "0 0 40%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div
@@ -43,7 +70,7 @@ export function AttrPanel({
         {selectedIds.size > 0 && <span style={{ fontSize: 9, color: T.accent.blue, fontWeight: 600 }}>已选 {selectedIds.size} 个图鉴</span>}
       </div>
 
-      <div style={{ flex: 1, overflow: "auto", padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+      <div ref={scrollRef} style={{ flex: 1, overflow: "auto", padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>
         {/* ── Attribute Pool ── */}
         <div style={{ padding: 8, background: T.bg.elevated, borderRadius: 6, border: `1px solid ${T.border.subtle}` }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
@@ -71,47 +98,119 @@ export function AttrPanel({
               属性池为空，点击上方按钮从属性管理器添加属性
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              {sys.attrPool.map((a) => {
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
+              {sys.attrPool.map((a, idx) => {
                 const used = usedAttrs.includes(a.key);
                 const totalCount = mountCounts[a.key] ? Object.values(mountCounts[a.key]).reduce((s, v) => s + v, 0) : 0;
                 const selHas = Array.from(selectedIds).some((id) => (sys.items.find((it) => it.id === id)?.attrs || []).includes(a.key));
-                const vtLabel = a.valueType === 2 ? "百分比" : a.valueType === 3 ? "小数" : "整数";
+                const vtLabel = a.valueType === 2 ? "%" : a.valueType === 3 ? ".00" : "int";
                 
-                // 拖拽开始处理
-                const handleDragStart = (e) => {
+                // 卡片区域拖拽 → 拖到 DataGrid 挂载
+                const handleCardDragStart = (e) => {
+                  if (handleRef.current) { e.preventDefault(); return; }
                   e.dataTransfer.setData("application/json", JSON.stringify({ type: "attr", attr: a }));
                   e.dataTransfer.effectAllowed = "copy";
                   if (onDragStart) onDragStart(a);
                 };
-                
-                const handleDragEnd = () => {
+                const handleCardDragEnd = () => {
                   if (onDragStart) onDragStart(null);
                 };
-                
+
+                // 手柄拖拽 → 池内排序
+                const handleHandleDragStart = (e) => {
+                  handleRef.current = true;
+                  e.stopPropagation();
+                  e.dataTransfer.setData("text/plain", String(idx));
+                  e.dataTransfer.effectAllowed = "move";
+                  setDragIdx(idx);
+                };
+                const handleHandleDragEnd = () => {
+                  handleRef.current = false;
+                  if (dragIdx !== null && overIdx !== null && dragIdx !== overIdx) {
+                    reorderAttrPool(dragIdx, overIdx);
+                  }
+                  setDragIdx(null);
+                  setOverIdx(null);
+                };
+
+                const handleDragOver = (e) => {
+                  if (dragIdx === null) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  setOverIdx(idx);
+                };
+                const handleDrop = (e) => {
+                  e.preventDefault();
+                };
+
+                const isDragging = dragIdx === idx;
+                const isOver = overIdx === idx && dragIdx !== null && dragIdx !== idx;
+                const ac = attrMap[a.key]?.color || a.color || T.accent.blue;
+
                 return (
                   <div
                     key={a.key}
                     draggable
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
+                    onDragStart={handleCardDragStart}
+                    onDragEnd={handleCardDragEnd}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
                     style={{
                       display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      padding: "3px 6px",
+                      flexDirection: "column",
+                      gap: 3,
+                      padding: "4px 5px",
                       borderRadius: 4,
-                      background: used ? `${T.accent.blue}08` : T.bg.input,
-                      border: `1px solid ${used ? T.accent.blue + "20" : T.border.subtle}`,
-                      cursor: "grab",
+                      background: used ? `${ac}08` : T.bg.input,
+                      border: `1px solid ${isOver ? ac : used ? ac + "20" : T.border.subtle}`,
+                      opacity: isDragging ? 0.4 : 1,
+                      transition: "border-color 0.15s, opacity 0.15s",
                     }}
                   >
-                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: used ? T.accent.blue : T.text.muted, flexShrink: 0 }} />
-                    <span style={{ fontSize: 10, fontWeight: 600, color: used ? T.text.primary : T.text.muted, minWidth: 48 }}>{a.name}</span>
-                    <span style={{ fontSize: 8, color: T.text.muted, fontFamily: F.mono }}>{a.attrId || "—"}</span>
-                    <span style={{ fontSize: 7, color: T.text.muted, padding: "0 3px", background: T.bg.elevated, borderRadius: 2 }}>{vtLabel}</span>
-                    {totalCount > 0 && <span style={{ fontSize: 8, color: T.accent.blue, fontFamily: F.mono }}>×{totalCount}</span>}
-                    <div style={{ marginLeft: "auto", display: "flex", gap: 2 }}>
+                    {/* Row 1: handle + color dot + name + remove */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                      <span
+                        draggable
+                        onDragStart={handleHandleDragStart}
+                        onDragEnd={handleHandleDragEnd}
+                        style={{ cursor: "grab", color: T.text.muted, fontSize: 10, lineHeight: 1, userSelect: "none", flexShrink: 0 }}
+                        title="拖拽排序"
+                      >⠿</span>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: ac, flexShrink: 0 }} />
+                      <span
+                        onClick={used ? () => scrollToAttrConfig(a.key) : undefined}
+                        style={{
+                          fontSize: 9, fontWeight: 600,
+                          color: used ? T.text.primary : T.text.muted,
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
+                          cursor: used ? "pointer" : "default",
+                          ...(used ? { textDecoration: "underline", textDecorationStyle: "dotted", textUnderlineOffset: 2 } : {}),
+                        }}
+                        title={used ? "点击定位到属性配置" : ""}
+                      >{a.name}</span>
+                      <button
+                        onClick={() => removeFromPool(a.key, usedAttrs)}
+                        disabled={used}
+                        style={{
+                          padding: "0 3px",
+                          border: "none",
+                          background: "transparent",
+                          color: !used ? T.text.muted : T.border.subtle,
+                          fontSize: 9,
+                          cursor: !used ? "pointer" : "not-allowed",
+                          flexShrink: 0,
+                          lineHeight: 1,
+                        }}
+                      >✕</button>
+                    </div>
+                    {/* Row 2: attrId + type + count */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 8 }}>
+                      <span style={{ color: T.text.muted, fontFamily: F.mono }}>{a.attrId || "—"}</span>
+                      <span style={{ color: T.text.muted, padding: "0 2px", background: T.bg.elevated, borderRadius: 2, fontSize: 7 }}>{vtLabel}</span>
+                      {totalCount > 0 && <span style={{ color: T.accent.blue, fontFamily: F.mono, marginLeft: "auto" }}>×{totalCount}</span>}
+                    </div>
+                    {/* Row 3: mount/unmount buttons */}
+                    <div style={{ display: "flex", gap: 2 }}>
                       <button
                         onClick={() => {
                           const ok = mountAttrToItems(a.key, selectedIds);
@@ -123,7 +222,8 @@ export function AttrPanel({
                         }}
                         disabled={selectedIds.size === 0}
                         style={{
-                          padding: "1px 6px",
+                          flex: 1,
+                          padding: "1px 0",
                           borderRadius: 2,
                           border: `1px solid ${selectedIds.size > 0 ? T.accent.green + "60" : T.border.subtle}`,
                           background: selectedIds.size > 0 ? `${T.accent.green}15` : "transparent",
@@ -132,9 +232,7 @@ export function AttrPanel({
                           cursor: selectedIds.size > 0 ? "pointer" : "not-allowed",
                           fontWeight: 600,
                         }}
-                      >
-                        挂载
-                      </button>
+                      >挂载</button>
                       <button
                         onClick={() => {
                           const ok = unmountAttrFromItems(a.key, selectedIds);
@@ -146,7 +244,8 @@ export function AttrPanel({
                         }}
                         disabled={selectedIds.size === 0 || !selHas}
                         style={{
-                          padding: "1px 6px",
+                          flex: 1,
+                          padding: "1px 0",
                           borderRadius: 2,
                           border: `1px solid ${selectedIds.size > 0 && selHas ? T.accent.red + "60" : T.border.subtle}`,
                           background: selectedIds.size > 0 && selHas ? `${T.accent.red}10` : "transparent",
@@ -155,24 +254,7 @@ export function AttrPanel({
                           cursor: selectedIds.size > 0 && selHas ? "pointer" : "not-allowed",
                           fontWeight: 600,
                         }}
-                      >
-                        卸载
-                      </button>
-                      <button
-                        onClick={() => removeFromPool(a.key, usedAttrs)}
-                        disabled={used}
-                        style={{
-                          padding: "1px 6px",
-                          borderRadius: 2,
-                          border: `1px solid ${!used ? T.text.muted + "60" : T.border.subtle}`,
-                          background: "transparent",
-                          color: !used ? T.text.muted : T.text.muted,
-                          fontSize: 8,
-                          cursor: !used ? "pointer" : "not-allowed",
-                        }}
-                      >
-                        ✕
-                      </button>
+                      >卸载</button>
                     </div>
                   </div>
                 );
@@ -206,12 +288,13 @@ export function AttrPanel({
           return (
             <div
               key={attrKey}
+              id={`attr-config-${attrKey}`}
               style={{
                 padding: 9,
                 background: T.bg.elevated,
                 borderRadius: 6,
                 border: `1px solid ${T.border.subtle}`,
-                borderLeft: `3px solid ${T.accent.blue}`,
+                borderLeft: `3px solid ${(attrMap[attrKey]?.color) || T.accent.blue}`,
               }}
             >
               {/* Header */}

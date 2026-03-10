@@ -4,7 +4,7 @@ import { createDefaultSystem } from "../constants/app";
 import { computeAttribute } from "../utils/compute";
 import { generateItems, generatePreviewIds } from "../utils/format";
 
-export function useSystems(showToast, setComputed, initialData = null) {
+export function useSystems(showToast, setComputed, initialData = null, globalAttrs = []) {
   const [systems, setSystems] = useState(() => {
     // 如果提供了初始数据（从存档加载），使用它
     if (initialData?.systems) return initialData.systems;
@@ -251,6 +251,19 @@ export function useSystems(showToast, setComputed, initialData = null) {
     [updateSystem, showToast]
   );
 
+  const reorderAttrPool = useCallback(
+    (fromIndex, toIndex) => {
+      if (fromIndex === toIndex) return;
+      updateSystem((sys) => {
+        const pool = [...sys.attrPool];
+        const [moved] = pool.splice(fromIndex, 1);
+        pool.splice(toIndex, 0, moved);
+        return { ...sys, attrPool: pool };
+      });
+    },
+    [updateSystem]
+  );
+
   // Attribute mounting
   const mountAttrToItems = useCallback(
     (attrKey, itemIds) => {
@@ -328,12 +341,14 @@ export function useSystems(showToast, setComputed, initialData = null) {
 
   // Computations
   const attrMap = useMemo(() => {
+    const gm = {};
+    globalAttrs.forEach((a) => { gm[a.key] = a; });
     const m = {};
     (activeSystem.attrPool || []).forEach((a) => {
-      m[a.key] = a;
+      m[a.key] = { ...a, color: a.color || gm[a.key]?.color };
     });
     return m;
-  }, [activeSystem.attrPool]);
+  }, [activeSystem.attrPool, globalAttrs]);
 
   const usedAttrs = useMemo(() => {
     const set = new Set();
@@ -444,6 +459,7 @@ export function useSystems(showToast, setComputed, initialData = null) {
     checkRegenerateImpact,
     addAttrToPool,
     removeFromPool,
+    reorderAttrPool,
     mountAttrToItems,
     unmountAttrFromItems,
     updateAttrConfig,

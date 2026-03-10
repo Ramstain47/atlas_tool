@@ -297,6 +297,7 @@ export default function App() {
     doGenerate,
     addAttrToPool,
     removeFromPool,
+    reorderAttrPool,
     mountAttrToItems,
     unmountAttrFromItems,
     updateAttrConfig,
@@ -310,7 +311,7 @@ export default function App() {
     computed,
     handleCompute,
     groupedItems,
-  } = useSystems(showToast, setComputedUI, initialData);
+  } = useSystems(showToast, setComputedUI, initialData, globalAttrs);
 
   // ── Computed Values ──
 
@@ -578,6 +579,7 @@ export default function App() {
           mountAttrToItems={mountAttrToItems}
           unmountAttrFromItems={unmountAttrFromItems}
           removeFromPool={removeFromPool}
+          reorderAttrPool={reorderAttrPool}
           attrResults={attrResults}
           actualTotals={actualTotals}
           computed={computed}

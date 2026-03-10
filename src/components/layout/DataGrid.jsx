@@ -175,6 +175,7 @@ export function DataGrid({
         name: ad?.name || attrKey,
         valueType: ad?.valueType || 1,
         attrId: ad?.attrId,
+        color: ad?.color,
         value: rawValue,
         isManual,
         hasValue: computed && autoVal !== undefined,
@@ -489,9 +490,9 @@ export function DataGrid({
                                           borderRadius: 3,
                                           fontSize: 9,
                                           fontWeight: 500,
-                                          background: `${T.accent.blue}15`,
-                                          color: T.accent.blue,
-                                          border: `1px solid ${T.accent.blue}30`,
+                                          background: `${a.color || T.accent.blue}15`,
+                                          color: a.color || T.accent.blue,
+                                          border: `1px solid ${a.color || T.accent.blue}30`,
                                           whiteSpace: "nowrap",
                                           flexShrink: 0,
                                         }}
@@ -559,7 +560,7 @@ export function DataGrid({
                                       width: 6,
                                       height: 6,
                                       borderRadius: "50%",
-                                      background: T.accent.blue,
+                                      background: a.color || T.accent.blue,
                                       flexShrink: 0,
                                     }}
                                   />

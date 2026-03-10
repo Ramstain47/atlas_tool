@@ -8,7 +8,13 @@ import { DEFAULT_GLOBAL_ATTRS, STORAGE_KEY_ATTRS, STORAGE_KEY_SYSTEMS, STORAGE_K
 export function loadGlobalAttrs() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY_ATTRS);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const attrs = JSON.parse(saved);
+      // 为缺少 color 的旧数据补充默认颜色
+      const defaults = {};
+      DEFAULT_GLOBAL_ATTRS.forEach((a) => { defaults[a.key] = a.color; });
+      return attrs.map((a) => a.color ? a : { ...a, color: defaults[a.key] || "#5B8DEF" });
+    }
   } catch {
     // ignore
   }
