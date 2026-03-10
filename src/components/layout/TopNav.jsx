@@ -9,6 +9,7 @@ export function TopNav({
   setShowAttrManager,
   setShowLoadManager,
   setShowSaveManager,
+  setShowTemplateManager,
   computed,
   showToast,
   setShowExportConfirm,
@@ -134,6 +135,21 @@ export function TopNav({
           }}
         >
           📋 属性管理器
+        </button>
+        <button
+          onClick={() => setShowTemplateManager(true)}
+          style={{
+            padding: "3px 8px",
+            borderRadius: 4,
+            border: `1px solid ${T.accent.orange}50`,
+            background: `${T.accent.orange}10`,
+            color: T.accent.orange,
+            fontSize: 10,
+            cursor: "pointer",
+            fontWeight: 600,
+          }}
+        >
+          📝 模板管理
         </button>
         <div style={{ width: 1, height: 16, background: T.border.subtle }} />
         <button

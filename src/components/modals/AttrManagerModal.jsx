@@ -1,10 +1,16 @@
+// ══════════════════════════════════════════════════════════
+//  属性管理器弹窗（紧凑布局 + 拖拽支持）
+// ══════════════════════════════════════════════════════════
+
 import { useState, useMemo } from "react";
 import { Modal } from "../ui/Modal";
 import { Inp } from "../ui/Inp";
 import { T, F } from "../../constants/theme";
 import * as XLSX from "xlsx";
 
-export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, showToast }) {
+const VALUE_TYPE_LABELS = { 1: "整数", 2: "百分比", 3: "小数" };
+
+export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, showToast, onDragStart }) {
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ key: "", name: "", attrId: "", valueType: "1" });
@@ -157,11 +163,23 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
     setForm({ key: "", name: "", attrId: "", valueType: "1" });
   };
 
+  // 拖拽开始
+  const handleDragStart = (e, attr) => {
+    e.dataTransfer.setData("application/json", JSON.stringify({ type: "attr", attr }));
+    e.dataTransfer.effectAllowed = "copy";
+    // 调用外部回调，用于设置全局拖拽状态
+    if (onDragStart) onDragStart(attr);
+  };
+
+  const handleDragEnd = () => {
+    if (onDragStart) onDragStart(null);
+  };
+
   return (
-    <Modal open={open} onClose={() => { onClose(); setEditing(null); cancelEdit(); }} title="属性管理器" width={520}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <Modal open={open} onClose={() => { onClose(); setEditing(null); cancelEdit(); }} title="属性管理器" width={560}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {/* Toolbar */}
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6 }}>
           <input
             type="text"
             placeholder="搜索属性..."
@@ -172,11 +190,10 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
               padding: "5px 8px",
               background: T.bg.input,
               border: `1px solid ${T.border.subtle}`,
-              borderRadius: 3,
+              borderRadius: 4,
               color: T.text.primary,
               fontSize: 11,
               outline: "none",
-              minWidth: 120,
             }}
           />
           <button
@@ -199,9 +216,10 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
               fontSize: 10,
               cursor: "pointer",
               fontWeight: 600,
+              whiteSpace: "nowrap",
             }}
           >
-            📥 导入Excel
+            📥 导入
           </button>
           <button
             onClick={handleExportExcel}
@@ -214,9 +232,10 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
               fontSize: 10,
               cursor: "pointer",
               fontWeight: 600,
+              whiteSpace: "nowrap",
             }}
           >
-            📤 导出Excel
+            📤 导出
           </button>
         </div>
 
@@ -228,20 +247,20 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: editing ? "1fr 1fr 80px 100px" : "1fr 1fr 80px 100px 80px",
+              gridTemplateColumns: editing ? "1fr 1fr 70px 80px" : "1fr 1fr 70px 80px 70px",
               gap: 6,
             }}
           >
             <Inp
-              label="属性Key"
+              label="Key"
               value={form.key}
               onChange={(v) => setForm((p) => ({ ...p, key: v }))}
               mono
               placeholder="atk"
               disabled={editing}
             />
-            <Inp label="属性名称" value={form.name} onChange={(v) => setForm((p) => ({ ...p, name: v }))} placeholder="攻击力" />
-            <Inp label="属性ID" value={form.attrId} onChange={(v) => setForm((p) => ({ ...p, attrId: v }))} mono placeholder="1001" />
+            <Inp label="名称" value={form.name} onChange={(v) => setForm((p) => ({ ...p, name: v }))} placeholder="攻击力" />
+            <Inp label="ID" value={form.attrId} onChange={(v) => setForm((p) => ({ ...p, attrId: v }))} mono placeholder="1001" />
             <div>
               <label
                 style={{
@@ -253,7 +272,7 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
                   marginBottom: 2,
                 }}
               >
-                数值类型
+                类型
               </label>
               <select
                 value={form.valueType}
@@ -329,91 +348,117 @@ export function AttrManagerModal({ open, onClose, globalAttrs, setGlobalAttrs, s
           </div>
         </div>
 
-        {/* Attributes List */}
-        <div style={{ maxHeight: 300, overflow: "auto" }}>
+        {/* Attributes List - 紧凑网格布局 */}
+        <div style={{ maxHeight: 320, overflow: "auto" }}>
+          {/* 表头 */}
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              padding: "4px 6px",
+              display: "grid",
+              gridTemplateColumns: "20px 80px 1fr 50px 50px 70px",
+              gap: 6,
+              padding: "4px 8px",
               background: T.bg.surface,
-              borderRadius: 3,
+              borderRadius: 4,
               marginBottom: 4,
-              fontSize: 8,
+              fontSize: 9,
               color: T.text.muted,
-              textTransform: "uppercase",
-              letterSpacing: 0.8,
+              fontWeight: 600,
             }}
           >
-            <span style={{ flex: 1 }}>属性名称</span>
-            <span style={{ width: 70 }}>Key</span>
-            <span style={{ width: 50 }}>ID</span>
-            <span style={{ width: 50 }}>类型</span>
-            <span style={{ width: 60, textAlign: "center" }}>操作</span>
+            <span></span>
+            <span>Key</span>
+            <span>名称</span>
+            <span>ID</span>
+            <span>类型</span>
+            <span style={{ textAlign: "center" }}>操作</span>
           </div>
+
           {filtered.length === 0 ? (
             <div style={{ padding: 20, textAlign: "center", color: T.text.muted, fontSize: 11 }}>
               {search ? "未找到匹配的属性" : "暂无属性，请添加或导入"}
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {filtered.map((attr) => {
-                const vtLabel = attr.valueType === 2 ? "百分比" : attr.valueType === 3 ? "小数" : "整数";
-                return (
-                  <div
-                    key={attr.key}
+            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {filtered.map((attr) => (
+                <div
+                  key={attr.key}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, attr)}
+                  onDragEnd={handleDragEnd}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "20px 80px 1fr 50px 50px 70px",
+                    gap: 6,
+                    alignItems: "center",
+                    padding: "4px 8px",
+                    background: T.bg.input,
+                    borderRadius: 3,
+                    fontSize: 10,
+                    cursor: "grab",
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = T.bg.hover; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = T.bg.input; }}
+                >
+                  {/* 拖拽手柄 */}
+                  <span
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      padding: "5px 6px",
-                      background: T.bg.input,
-                      borderRadius: 3,
-                      fontSize: 10,
+                      color: T.text.muted,
+                      fontSize: 11,
+                      cursor: "grab",
+                      userSelect: "none",
                     }}
+                    title="拖拽到图鉴以挂载"
                   >
-                    <span style={{ flex: 1, fontWeight: 600, color: T.text.primary }}>{attr.name}</span>
-                    <span style={{ width: 70, fontFamily: F.mono, color: T.text.secondary, fontSize: 9 }}>{attr.key}</span>
-                    <span style={{ width: 50, fontFamily: F.mono, color: T.text.muted }}>{attr.attrId}</span>
-                    <span style={{ width: 50, color: T.text.muted }}>{vtLabel}</span>
-                    <div style={{ width: 60, display: "flex", gap: 4, justifyContent: "center" }}>
-                      <button
-                        onClick={() => startEdit(attr)}
-                        style={{
-                          padding: "1px 5px",
-                          borderRadius: 2,
-                          border: `1px solid ${T.border.default}`,
-                          background: "transparent",
-                          color: T.text.secondary,
-                          fontSize: 8,
-                          cursor: "pointer",
-                        }}
-                      >
-                        编辑
-                      </button>
-                      <button
-                        onClick={() => handleDelete(attr.key)}
-                        style={{
-                          padding: "1px 5px",
-                          borderRadius: 2,
-                          border: `1px solid ${T.accent.red}40`,
-                          background: `${T.accent.red}10`,
-                          color: T.accent.red,
-                          fontSize: 8,
-                          cursor: "pointer",
-                        }}
-                      >
-                        删除
-                      </button>
-                    </div>
+                    ⋮⋮
+                  </span>
+                  <span style={{ fontFamily: F.mono, color: T.text.secondary, fontSize: 9, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {attr.key}
+                  </span>
+                  <span style={{ fontWeight: 600, color: T.text.primary, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {attr.name}
+                  </span>
+                  <span style={{ fontFamily: F.mono, color: T.text.muted, fontSize: 9 }}>{attr.attrId}</span>
+                  <span style={{ fontSize: 8, color: T.text.secondary }}>{VALUE_TYPE_LABELS[attr.valueType] || "整数"}</span>
+                  <div style={{ display: "flex", gap: 3, justifyContent: "center" }}>
+                    <button
+                      onClick={() => startEdit(attr)}
+                      style={{
+                        padding: "1px 5px",
+                        borderRadius: 2,
+                        border: `1px solid ${T.border.default}`,
+                        background: "transparent",
+                        color: T.text.secondary,
+                        fontSize: 8,
+                        cursor: "pointer",
+                      }}
+                    >
+                      编辑
+                    </button>
+                    <button
+                      onClick={() => handleDelete(attr.key)}
+                      style={{
+                        padding: "1px 5px",
+                        borderRadius: 2,
+                        border: `1px solid ${T.accent.red}40`,
+                        background: `${T.accent.red}10`,
+                        color: T.accent.red,
+                        fontSize: 8,
+                        cursor: "pointer",
+                      }}
+                    >
+                      删除
+                    </button>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
         </div>
 
-        <div style={{ fontSize: 8, color: T.text.muted, textAlign: "center" }}>
+        <div style={{ fontSize: 9, color: T.text.muted, textAlign: "center" }}>
           共 {globalAttrs.length} 个属性 {search && `(搜索到 ${filtered.length} 个)`}
+          <span style={{ marginLeft: 8, opacity: 0.7 }}>⋮⋮ 拖拽属性到图鉴以快速挂载</span>
         </div>
       </div>
     </Modal>

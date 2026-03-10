@@ -51,7 +51,7 @@ export function useSystems(showToast, setComputed, initialData = null) {
   }, [updateSystem]);
 
   const addSystem = useCallback(
-    (name, code) => {
+    (name, code, template = null) => {
       if (!name.trim() || !code.trim()) {
         showToast("请填写名称和ID段", "red");
         return false;
@@ -61,10 +61,23 @@ export function useSystems(showToast, setComputed, initialData = null) {
         return false;
       }
       const ns = createDefaultSystem(name.trim(), code.trim());
+      
+      // 如果提供了模板，应用模板配置
+      if (template) {
+        ns.qualities = template.qualities.map((q) => ({ ...q }));
+        ns.attrPool = template.attrPool.map((a) => ({ ...a }));
+        ns.attrConfigs = { ...template.attrConfigs };
+      }
+      
       setSystems((prev) => [...prev, ns]);
       setActiveSystemId(ns.id);
       setComputed(false);
-      showToast(`系统 "${name.trim()}" 已创建`, "green");
+      
+      if (template) {
+        showToast(`系统 "${name.trim()}" 已使用模板创建`, "green");
+      } else {
+        showToast(`系统 "${name.trim()}" 已创建`, "green");
+      }
       return true;
     },
     [systems, showToast, setComputed]

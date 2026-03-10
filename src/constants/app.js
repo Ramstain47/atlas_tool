@@ -18,6 +18,7 @@ export const DEFAULT_GLOBAL_ATTRS = [
 export const STORAGE_KEY_ATTRS = "codex_global_attrs";
 export const STORAGE_KEY_SYSTEMS = "codex_systems";
 export const STORAGE_KEY_SAVE_SLOTS = "codex_save_slots";
+export const STORAGE_KEY_TEMPLATES = "codex_templates";
 
 // 最大存档槽位数
 export const MAX_SAVE_SLOTS = 20;

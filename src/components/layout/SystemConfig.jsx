@@ -13,6 +13,7 @@ export function SystemConfig({
   handleGenerate,
   setShowAddQuality,
   setNewQStar,
+  onSaveTemplate,
 }) {
   return (
     <div style={{ background: T.bg.surface, borderBottom: `1px solid ${T.border.subtle}`, flexShrink: 0 }}>
@@ -163,6 +164,24 @@ export function SystemConfig({
               }}
             >
               ⚡ 生成底表
+            </button>
+          </div>
+          <div style={{ minWidth: 80, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <button
+              onClick={onSaveTemplate}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 6,
+                border: `1px solid ${T.accent.green}`,
+                background: "transparent",
+                color: T.accent.green,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              💾 存为模板
             </button>
           </div>
         </div>

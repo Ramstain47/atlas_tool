@@ -24,6 +24,7 @@ export function AttrPanel({
   showToast,
   setSelectedIds,
   setMultiSelectMode,
+  onDragStart,
 }) {
   return (
     <div style={{ flex: "0 0 40%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -76,9 +77,24 @@ export function AttrPanel({
                 const totalCount = mountCounts[a.key] ? Object.values(mountCounts[a.key]).reduce((s, v) => s + v, 0) : 0;
                 const selHas = Array.from(selectedIds).some((id) => (sys.items.find((it) => it.id === id)?.attrs || []).includes(a.key));
                 const vtLabel = a.valueType === 2 ? "百分比" : a.valueType === 3 ? "小数" : "整数";
+                
+                // 拖拽开始处理
+                const handleDragStart = (e) => {
+                  e.dataTransfer.setData("application/json", JSON.stringify({ type: "attr", attr: a }));
+                  e.dataTransfer.effectAllowed = "copy";
+                  if (onDragStart) onDragStart(a);
+                };
+                
+                const handleDragEnd = () => {
+                  if (onDragStart) onDragStart(null);
+                };
+                
                 return (
                   <div
                     key={a.key}
+                    draggable
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -87,6 +103,7 @@ export function AttrPanel({
                       borderRadius: 4,
                       background: used ? `${T.accent.blue}08` : T.bg.input,
                       border: `1px solid ${used ? T.accent.blue + "20" : T.border.subtle}`,
+                      cursor: "grab",
                     }}
                   >
                     <span style={{ width: 5, height: 5, borderRadius: "50%", background: used ? T.accent.blue : T.text.muted, flexShrink: 0 }} />

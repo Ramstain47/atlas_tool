@@ -13,7 +13,7 @@ export function Modal({ open, onClose, title, children, width }) {
         justifyContent: "center",
         background: "rgba(0,0,0,0.6)",
       }}
-      onClick={onClose}
+      onMouseDown={onClose}
     >
       <div
         style={{
@@ -26,7 +26,7 @@ export function Modal({ open, onClose, title, children, width }) {
           overflow: "auto",
           boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
         }}
-        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>

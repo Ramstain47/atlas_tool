@@ -27,6 +27,7 @@ export const T = {
     yellow: "#FFB300",
     red: "#EF5350",
     purple: "#AB47BC",
+    orange: "#FFA726",
   },
   quality: {
     1: { color: "#B0B8C8", bg: "#B0B8C810", border: "#B0B8C830", label: "白色", name: "普通" },

@@ -5,6 +5,7 @@ import { useToast } from "./hooks/useToast";
 import { useGlobalAttrs } from "./hooks/useGlobalAttrs";
 import { useSaveSlots } from "./hooks/useSaveSlots";
 import { useSystems } from "./hooks/useSystems";
+import { useTemplates } from "./hooks/useTemplates";
 import { TopNav } from "./components/layout/TopNav";
 import { SystemConfig } from "./components/layout/SystemConfig";
 import { DataGrid } from "./components/layout/DataGrid";
@@ -16,6 +17,8 @@ import { SelectAttrModal } from "./components/modals/SelectAttrModal";
 import { AttrManagerModal } from "./components/modals/AttrManagerModal";
 import { SaveManagerModal } from "./components/modals/SaveManagerModal";
 import { LoadManagerModal } from "./components/modals/LoadManagerModal";
+import { TemplateManagerModal } from "./components/modals/TemplateManagerModal";
+import { SaveTemplateModal } from "./components/modals/SaveTemplateModal";
 
 // ══════════════════════════════════════════════════════════
 //  全局样式 - 清除浏览器默认边距
@@ -244,6 +247,7 @@ export default function App() {
   const { toast, showToast } = useToast();
   const { globalAttrs, setGlobalAttrs } = useGlobalAttrs(showToast);
   const { saveSlots, maxSlots, handleSaveToSlot, handleLoadFromSlot, handleDeleteSlot, getSlotInfo } = useSaveSlots(showToast);
+  const { templates, createTemplate, deleteTemplate, renameTemplate } = useTemplates(showToast);
 
   // ── Boot State ──
   const [booted, setBooted] = useState(false);
@@ -255,6 +259,7 @@ export default function App() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [, setComputedUI] = useState(false);
+  const [draggedAttr, setDraggedAttr] = useState(null); // 正在拖拽的属性
 
   // ── Modal State ──
   const [showNewSystem, setShowNewSystem] = useState(false);
@@ -264,6 +269,8 @@ export default function App() {
   const [showSelectFromManager, setShowSelectFromManager] = useState(false);
   const [showSaveManager, setShowSaveManager] = useState(false);
   const [showLoadManager, setShowLoadManager] = useState(false);
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
   const [regenCheckInfo, setRegenCheckInfo] = useState(null);
 
@@ -314,8 +321,9 @@ export default function App() {
 
   // ── Event Handlers ──
   const handleAddSystem = useCallback(
-    (name, code) => {
-      return addSystem(name, code);
+    (name, code, template) => {
+      // 直接传递模板给 addSystem，让它在创建时应用
+      return addSystem(name, code, template);
     },
     [addSystem]
   );
@@ -517,6 +525,7 @@ export default function App() {
         setShowAttrManager={setShowAttrManager}
         setShowLoadManager={setShowLoadManager}
         setShowSaveManager={setShowSaveManager}
+        setShowTemplateManager={setShowTemplateManager}
         computed={computed}
         showToast={showToast}
         setShowExportConfirm={setShowExportConfirm}
@@ -533,6 +542,7 @@ export default function App() {
         handleGenerate={handleGenerateClick}
         setShowAddQuality={setShowAddQuality}
         setNewQStar={setNewQStar}
+        onSaveTemplate={() => setShowSaveTemplate(true)}
       />
 
       {/* ═══ MAIN WORKSPACE ═══ */}
@@ -552,6 +562,9 @@ export default function App() {
           computed={computed}
           attrResults={attrResults}
           setManualOverride={setManualOverride}
+          mountAttrToItems={mountAttrToItems}
+          showToast={showToast}
+          draggedAttr={draggedAttr}
         />
 
         {/* ── RIGHT: Attribute Dashboard ── */}
@@ -574,11 +587,12 @@ export default function App() {
           showToast={showToast}
           setSelectedIds={setSelectedIds}
           setMultiSelectMode={setMultiSelectMode}
+          onDragStart={setDraggedAttr}
         />
       </div>
 
       {/* ═══ MODALS ═══ */}
-      <NewSystemModal open={showNewSystem} onClose={() => setShowNewSystem(false)} onCreate={handleAddSystem} />
+      <NewSystemModal key={showNewSystem ? "new-open" : "new-closed"} open={showNewSystem} onClose={() => setShowNewSystem(false)} onCreate={handleAddSystem} templates={templates} />
 
       <AddQualityModal
         open={showAddQuality}
@@ -613,6 +627,7 @@ export default function App() {
         setGlobalAttrs={setGlobalAttrs}
         showToast={showToast}
         onAddToPool={handleMountAttr}
+        onDragStart={setDraggedAttr}
       />
 
       <SaveManagerModal
@@ -634,6 +649,22 @@ export default function App() {
         onDelete={handleDeleteSlot}
       />
 
+      <TemplateManagerModal
+        open={showTemplateManager}
+        onClose={() => setShowTemplateManager(false)}
+        templates={templates}
+        onDelete={deleteTemplate}
+        onRename={renameTemplate}
+      />
+
+      <SaveTemplateModal
+        key={showSaveTemplate ? "save-open" : "save-closed"}
+        open={showSaveTemplate}
+        onClose={() => setShowSaveTemplate(false)}
+        onSave={(name) => createTemplate(name, activeSystem)}
+        systemName={activeSystem?.name}
+      />
+
       {/* Regenerate Confirm Modal */}
       {showRegenConfirm && (
         <div
@@ -646,7 +677,7 @@ export default function App() {
             justifyContent: "center",
             background: "rgba(0,0,0,0.6)",
           }}
-          onClick={() => setShowRegenConfirm(false)}
+          onMouseDown={() => setShowRegenConfirm(false)}
         >
           <div
             style={{
@@ -657,7 +688,7 @@ export default function App() {
               width: 360,
               boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
             }}
-            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>确认重新生成底表？</div>
             <div style={{ fontSize: 11, color: T.text.secondary, marginBottom: 16, lineHeight: 1.5 }}>
@@ -665,7 +696,7 @@ export default function App() {
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <button
-                onClick={() => setShowRegenConfirm(false)}
+                onMouseDown={() => setShowRegenConfirm(false)}
                 style={{
                   padding: "6px 12px",
                   borderRadius: 5,

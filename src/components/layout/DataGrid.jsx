@@ -1,7 +1,15 @@
-import { useState } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { T, F } from "../../constants/theme";
 import { QBadge } from "../ui/QBadge";
 import { formatValue } from "../../utils/format";
+
+// 估算标签宽度（中文字符约 14px，加上 padding 和边框约 16px）
+function estimateTagWidth(name, hasValue) {
+  const charWidth = name.match(/[\u4e00-\u9fa5]/) ? 13 : 8;
+  const padding = 14; // 左右 padding + 边框
+  const valueWidth = hasValue ? 40 : 0; // 数值大概宽度
+  return name.length * charWidth + padding + valueWidth;
+}
 
 export function DataGrid({
   sys,
@@ -16,9 +24,17 @@ export function DataGrid({
   computed,
   attrResults,
   setManualOverride,
+  mountAttrToItems,
+  showToast,
+  draggedAttr,
 }) {
   // 记录每个条目是否展开属性详情
   const [expandedItems, setExpandedItems] = useState(new Set());
+  // 拖拽悬停的条目ID
+  const [dragOverItemId, setDragOverItemId] = useState(null);
+  // 属性列容器宽度（用于计算能显示几个标签）
+  const attrColRef = useRef(null);
+  const [colWidth, setColWidth] = useState(200);
 
   const toggleGroup = (star) =>
     setCollapsedGroups((prev) => {
@@ -78,6 +94,61 @@ export function DataGrid({
   const collapseAllItems = () => {
     setExpandedItems(new Set());
   };
+
+  // 监听属性列宽度变化
+  useEffect(() => {
+    if (!attrColRef.current) return;
+    
+    const updateWidth = () => {
+      if (attrColRef.current) {
+        setColWidth(attrColRef.current.clientWidth);
+      }
+    };
+    
+    updateWidth();
+    
+    // 监听窗口大小变化
+    window.addEventListener("resize", updateWidth);
+    
+    // 使用 ResizeObserver 监听容器变化
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(attrColRef.current);
+    
+    return () => {
+      window.removeEventListener("resize", updateWidth);
+      observer.disconnect();
+    };
+  }, []);
+
+  // 拖拽处理
+  const handleDragOver = useCallback((e, itemId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setDragOverItemId(itemId);
+  }, []);
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    setDragOverItemId(null);
+  }, []);
+
+  const handleDrop = useCallback((e, itemId) => {
+    e.preventDefault();
+    setDragOverItemId(null);
+    
+    try {
+      const data = JSON.parse(e.dataTransfer.getData("application/json"));
+      if (data.type === "attr" && data.attr) {
+        // 挂载属性到该条目
+        const ok = mountAttrToItems(data.attr.key, new Set([itemId]));
+        if (ok) {
+          showToast(`已为 ${itemId} 挂载 ${data.attr.name}`, "green");
+        }
+      }
+    } catch (err) {
+      console.error("拖拽数据解析失败:", err);
+    }
+  }, [mountAttrToItems, showToast]);
 
   // 格式化带符号的数值
   const formatSignedValue = (value, valueType) => {
@@ -328,12 +399,25 @@ export function DataGrid({
                     const itemAttrs = getItemAttrList(item);
                     const hasAttrs = itemAttrs.length > 0;
 
+                    const isDragOver = dragOverItemId === item.id && draggedAttr;
+                    
                     return (
                       <div
                         key={item.id}
+                        onDragOver={(e) => handleDragOver(e, item.id)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, item.id)}
                         style={{
                           borderBottom: `1px solid ${T.border.subtle}`,
-                          background: isSel ? T.bg.active : idx % 2 === 0 ? T.bg.app : T.bg.surface,
+                          background: isDragOver 
+                            ? `${T.accent.green}20` 
+                            : isSel 
+                              ? T.bg.active 
+                              : idx % 2 === 0 
+                                ? T.bg.app 
+                                : T.bg.surface,
+                          borderLeft: isDragOver ? `3px solid ${T.accent.green}` : "3px solid transparent",
+                          transition: "background 0.15s, border-left 0.15s",
                         }}
                       >
                         {/* Item Row */}
@@ -369,36 +453,65 @@ export function DataGrid({
                             {item.maxStack}
                           </span>
 
-                          {/* 属性摘要（仅显示名称） */}
-                          <span style={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
+                          {/* 属性摘要（自适应显示） */}
+                          <span ref={idx === 0 ? attrColRef : undefined} style={{ display: "flex", gap: 2, flexWrap: "nowrap", alignItems: "center", overflow: "hidden" }}>
                             {!hasAttrs ? (
                               <span style={{ color: T.text.muted, fontSize: 8 }}>未挂载</span>
                             ) : (
-                              itemAttrs.slice(0, 2).map((a) => (
-                                <span
-                                  key={a.key}
-                                  style={{
-                                    padding: "1px 6px",
-                                    borderRadius: 3,
-                                    fontSize: 9,
-                                    fontWeight: 500,
-                                    background: `${T.accent.blue}15`,
-                                    color: T.accent.blue,
-                                    border: `1px solid ${T.accent.blue}30`,
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {a.name}
-                                  {a.hasValue && (
-                                    <span style={{ marginLeft: 4, color: T.accent.green, fontWeight: 600 }}>
-                                      {formatSignedValue(a.value, a.valueType)}
-                                    </span>
-                                  )}
-                                </span>
-                              ))
-                            )}
-                            {itemAttrs.length > 2 && (
-                              <span style={{ fontSize: 8, color: T.text.muted }}>+{itemAttrs.length - 2}</span>
+                              (() => {
+                                // 动态计算能显示几个标签
+                                let usedWidth = 0;
+                                const gap = 2;
+                                const moreWidth = 20; // "+n" 的宽度
+                                let visibleCount = 0;
+                                
+                                for (let i = 0; i < itemAttrs.length; i++) {
+                                  const a = itemAttrs[i];
+                                  const tagWidth = estimateTagWidth(a.name, a.hasValue);
+                                  const needed = usedWidth + tagWidth + (visibleCount > 0 ? gap : 0);
+                                  const remaining = itemAttrs.length > i + 1 ? moreWidth : 0;
+                                  
+                                  if (needed + remaining <= colWidth) {
+                                    usedWidth = needed;
+                                    visibleCount++;
+                                  } else {
+                                    break;
+                                  }
+                                }
+                                
+                                return (
+                                  <>
+                                    {itemAttrs.slice(0, visibleCount).map((a) => (
+                                      <span
+                                        key={a.key}
+                                        style={{
+                                          padding: "1px 6px",
+                                          borderRadius: 3,
+                                          fontSize: 9,
+                                          fontWeight: 500,
+                                          background: `${T.accent.blue}15`,
+                                          color: T.accent.blue,
+                                          border: `1px solid ${T.accent.blue}30`,
+                                          whiteSpace: "nowrap",
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        {a.name}
+                                        {a.hasValue && (
+                                          <span style={{ marginLeft: 4, color: T.accent.green, fontWeight: 600 }}>
+                                            {formatSignedValue(a.value, a.valueType)}
+                                          </span>
+                                        )}
+                                      </span>
+                                    ))}
+                                    {itemAttrs.length > visibleCount && (
+                                      <span style={{ fontSize: 8, color: T.text.muted, whiteSpace: "nowrap", flexShrink: 0 }}>
+                                        +{itemAttrs.length - visibleCount}
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              })()
                             )}
                           </span>
 
