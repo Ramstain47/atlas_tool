@@ -27,7 +27,7 @@ export function useTemplates(showToast) {
   }, [templates]);
 
   const createTemplate = useCallback(
-    (name, system) => {
+    (name, system, includeMount = false) => {
       const trimmedName = name.trim();
       if (!trimmedName) {
         showToast("请输入模板名称", "red");
@@ -48,6 +48,20 @@ export function useTemplates(showToast) {
         attrConfigs: { ...system.attrConfigs },
         createdAt: Date.now(),
       };
+
+      // 按星级+序号保存每个条目的属性挂载关系
+      if (includeMount && system.items?.length > 0) {
+        const starAttrMap = {};
+        const starGroups = {};
+        for (const item of system.items) {
+          if (!starGroups[item.star]) starGroups[item.star] = [];
+          starGroups[item.star].push(item.attrs || []);
+        }
+        for (const [star, attrsList] of Object.entries(starGroups)) {
+          starAttrMap[star] = attrsList;
+        }
+        template.starAttrMap = starAttrMap;
+      }
 
       setTemplates((prev) => [...prev, template]);
       showToast(`模板 "${trimmedName}" 已保存`, "green");

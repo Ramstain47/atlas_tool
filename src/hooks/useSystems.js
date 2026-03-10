@@ -61,19 +61,40 @@ export function useSystems(showToast, setComputed, initialData = null, globalAtt
         return false;
       }
       const ns = createDefaultSystem(name.trim(), code.trim());
-      
+
       // 如果提供了模板，应用模板配置
       if (template) {
         ns.qualities = template.qualities.map((q) => ({ ...q }));
         ns.attrPool = template.attrPool.map((a) => ({ ...a }));
         ns.attrConfigs = { ...template.attrConfigs };
+
+        // 如果模板包含属性挂载关系，自动生成底表并挂载属性
+        if (template.starAttrMap) {
+          const items = generateItems(ns.qualities, ns.code);
+          const starGroups = {};
+          for (const item of items) {
+            if (!starGroups[item.star]) starGroups[item.star] = [];
+            starGroups[item.star].push(item);
+          }
+          for (const [star, groupItems] of Object.entries(starGroups)) {
+            const templateAttrs = template.starAttrMap[star];
+            if (!templateAttrs) continue;
+            for (let i = 0; i < groupItems.length && i < templateAttrs.length; i++) {
+              groupItems[i].attrs = [...templateAttrs[i]];
+            }
+          }
+          ns.items = items;
+          ns.generated = true;
+        }
       }
-      
+
       setSystems((prev) => [...prev, ns]);
       setActiveSystemId(ns.id);
       setComputed(false);
-      
-      if (template) {
+
+      if (template?.starAttrMap) {
+        showToast(`系统 "${name.trim()}" 已使用模板创建并自动挂载属性`, "green");
+      } else if (template) {
         showToast(`系统 "${name.trim()}" 已使用模板创建`, "green");
       } else {
         showToast(`系统 "${name.trim()}" 已创建`, "green");

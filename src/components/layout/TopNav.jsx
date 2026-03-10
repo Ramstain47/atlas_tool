@@ -13,6 +13,7 @@ export function TopNav({
   computed,
   showToast,
   setShowExportConfirm,
+  setShowGlobalAnalysis,
 }) {
   return (
     <div
@@ -121,6 +122,21 @@ export function TopNav({
         </div>
       </div>
       <div style={{ display: "flex", gap: 5 }}>
+        <button
+          onClick={() => setShowGlobalAnalysis(true)}
+          style={{
+            padding: "3px 8px",
+            borderRadius: 4,
+            border: `1px solid ${T.accent.blue}50`,
+            background: `${T.accent.blue}10`,
+            color: T.accent.blue,
+            fontSize: 10,
+            cursor: "pointer",
+            fontWeight: 600,
+          }}
+        >
+          📊 全局分析
+        </button>
         <button
           onClick={() => setShowAttrManager(true)}
           style={{

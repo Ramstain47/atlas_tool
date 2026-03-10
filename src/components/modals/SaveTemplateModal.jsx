@@ -7,11 +7,12 @@ import { Modal } from "../ui/Modal";
 import { Inp } from "../ui/Inp";
 import { T } from "../../constants/theme";
 
-export function SaveTemplateModal({ open, onClose, onSave, systemName }) {
+export function SaveTemplateModal({ open, onClose, onSave, systemName, hasItems }) {
   const [name, setName] = useState(() => systemName ? `${systemName}-模板` : "");
+  const [includeMount, setIncludeMount] = useState(false);
 
   const handleSave = () => {
-    if (onSave(name)) {
+    if (onSave(name, includeMount)) {
       onClose();
     }
   };
@@ -28,6 +29,29 @@ export function SaveTemplateModal({ open, onClose, onSave, systemName }) {
           onChange={setName}
           placeholder="如：标准装备配置"
         />
+        {hasItems && (
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 12,
+              color: T.text.primary,
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={includeMount}
+              onChange={(e) => setIncludeMount(e.target.checked)}
+              style={{ cursor: "pointer" }}
+            />
+            包含属性挂载关系
+            <span style={{ fontSize: 11, color: T.text.secondary }}>
+              （使用此模板时将自动生成底表并挂载属性）
+            </span>
+          </label>
+        )}
         <div
           style={{
             fontSize: 11,
@@ -41,6 +65,11 @@ export function SaveTemplateModal({ open, onClose, onSave, systemName }) {
           <div>• 品质层级配置（星级、数量、堆叠、权重）</div>
           <div>• 属性池配置</div>
           <div>• 计算参数（上限、单位、取整方式）</div>
+          {includeMount && (
+            <div style={{ color: T.accent.blue }}>
+              • 每个图鉴条目的属性挂载关系（按星级+序号）
+            </div>
+          )}
           <div style={{ marginTop: 4, color: T.accent.yellow }}>
             • 图鉴条目和手动覆盖值不会被保存
           </div>

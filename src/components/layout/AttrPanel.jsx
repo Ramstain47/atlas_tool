@@ -66,8 +66,47 @@ export function AttrPanel({
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 11, fontWeight: 600 }}>属性管理</span>
-        {selectedIds.size > 0 && <span style={{ fontSize: 9, color: T.accent.blue, fontWeight: 600 }}>已选 {selectedIds.size} 个图鉴</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 600 }}>属性管理</span>
+          {selectedIds.size > 0 && <span style={{ fontSize: 9, color: T.accent.blue, fontWeight: 600 }}>已选 {selectedIds.size} 个图鉴</span>}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          {computed && Object.keys(sys.manualOverrides).filter((k) => sys.manualOverrides[k] !== undefined).length > 0 && (
+            <button
+              onClick={clearAllOverrides}
+              style={{
+                padding: "2px 6px",
+                borderRadius: 4,
+                border: `1px solid ${T.accent.yellow}40`,
+                background: `${T.accent.yellow}10`,
+                color: T.accent.yellow,
+                fontSize: 9,
+                cursor: "pointer",
+                fontWeight: 600,
+                lineHeight: 1.2,
+              }}
+            >
+              ↺ 清除手动值
+            </button>
+          )}
+          <button
+            onClick={handleCompute}
+            disabled={usedAttrs.length === 0}
+            style={{
+              padding: "2px 8px",
+              borderRadius: 4,
+              border: "none",
+              background: usedAttrs.length === 0 ? T.bg.elevated : `linear-gradient(135deg, ${T.accent.blue}, ${T.accent.purple})`,
+              color: usedAttrs.length === 0 ? T.text.muted : "#fff",
+              fontSize: 10,
+              fontWeight: 700,
+              cursor: usedAttrs.length === 0 ? "not-allowed" : "pointer",
+              lineHeight: 1.2,
+            }}
+          >
+            ⚡ 自动分配
+          </button>
+        </div>
       </div>
 
       <div ref={scrollRef} style={{ flex: 1, overflow: "auto", padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>
@@ -446,44 +485,7 @@ export function AttrPanel({
           <div style={{ padding: 16, textAlign: "center", color: T.text.muted, fontSize: 11 }}>选择图鉴后使用上方属性池的「挂载」按钮分配属性</div>
         )}
 
-        {/* Actions */}
-        <div style={{ display: "flex", gap: 5, marginTop: 2 }}>
-          <button
-            onClick={handleCompute}
-            disabled={usedAttrs.length === 0}
-            style={{
-              flex: 1,
-              padding: "8px 12px",
-              borderRadius: 6,
-              border: "none",
-              background: usedAttrs.length === 0 ? T.bg.elevated : `linear-gradient(135deg, ${T.accent.blue}, ${T.accent.purple})`,
-              color: usedAttrs.length === 0 ? T.text.muted : "#fff",
-              fontSize: 11,
-              fontWeight: 700,
-              cursor: usedAttrs.length === 0 ? "not-allowed" : "pointer",
-              boxShadow: usedAttrs.length > 0 ? `0 3px 10px ${T.accent.blue}30` : "none",
-            }}
-          >
-            ⚡ 执行自动分配
-          </button>
-          {computed && Object.keys(sys.manualOverrides).filter((k) => sys.manualOverrides[k] !== undefined).length > 0 && (
-            <button
-              onClick={clearAllOverrides}
-              style={{
-                padding: "8px 8px",
-                borderRadius: 6,
-                border: `1px solid ${T.accent.yellow}40`,
-                background: `${T.accent.yellow}10`,
-                color: T.accent.yellow,
-                fontSize: 9,
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
-              ↺ 清除手动值
-            </button>
-          )}
-        </div>
+        {/* Actions moved to header */}
       </div>
     </div>
   );

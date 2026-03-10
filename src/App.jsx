@@ -19,6 +19,7 @@ import { SaveManagerModal } from "./components/modals/SaveManagerModal";
 import { LoadManagerModal } from "./components/modals/LoadManagerModal";
 import { TemplateManagerModal } from "./components/modals/TemplateManagerModal";
 import { SaveTemplateModal } from "./components/modals/SaveTemplateModal";
+import { GlobalAnalysisModal } from "./components/modals/GlobalAnalysisModal";
 
 // ══════════════════════════════════════════════════════════
 //  全局样式 - 清除浏览器默认边距
@@ -271,6 +272,7 @@ export default function App() {
   const [showLoadManager, setShowLoadManager] = useState(false);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [showGlobalAnalysis, setShowGlobalAnalysis] = useState(false);
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
   const [regenCheckInfo, setRegenCheckInfo] = useState(null);
 
@@ -530,6 +532,7 @@ export default function App() {
         computed={computed}
         showToast={showToast}
         setShowExportConfirm={setShowExportConfirm}
+        setShowGlobalAnalysis={setShowGlobalAnalysis}
       />
 
       {/* ═══ SYSTEM CONFIG ═══ */}
@@ -663,11 +666,19 @@ export default function App() {
         key={showSaveTemplate ? "save-open" : "save-closed"}
         open={showSaveTemplate}
         onClose={() => setShowSaveTemplate(false)}
-        onSave={(name) => createTemplate(name, activeSystem)}
+        onSave={(name, includeMount) => createTemplate(name, activeSystem, includeMount)}
+        hasItems={activeSystem?.items?.length > 0}
         systemName={activeSystem?.name}
       />
 
       {/* Regenerate Confirm Modal */}
+      <GlobalAnalysisModal
+        open={showGlobalAnalysis}
+        onClose={() => setShowGlobalAnalysis(false)}
+        systems={systems}
+        globalAttrs={globalAttrs}
+      />
+
       {showRegenConfirm && (
         <div
           style={{

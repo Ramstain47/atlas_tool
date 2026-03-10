@@ -1,6 +1,6 @@
 import { T } from "../../constants/theme";
 
-export function MiniBar({ segments }) {
+export function MiniBar({ segments, formatFn }) {
   const total = segments.reduce((s, x) => s + x.value, 0);
   if (total === 0) return null;
   return (
@@ -22,7 +22,7 @@ export function MiniBar({ segments }) {
             background: seg.color,
             transition: "width 0.3s",
           }}
-          title={`${seg.label}: ${seg.value}`}
+          title={`${seg.label}: ${formatFn ? formatFn(seg.value) : seg.value}`}
         />
       ))}
     </div>

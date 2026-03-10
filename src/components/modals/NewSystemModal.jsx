@@ -52,19 +52,28 @@ export function NewSystemModal({ open, onClose, onCreate, templates }) {
                 </option>
               ))}
             </select>
-            {selectedTemplateId && (
-              <div
-                style={{
-                  fontSize: 11,
-                  color: T.accent.blue,
-                  background: `${T.accent.blue}15`,
-                  padding: "6px 8px",
-                  borderRadius: 4,
-                }}
-              >
-                将复制品质配置、属性池和计算参数
-              </div>
-            )}
+            {selectedTemplateId && (() => {
+              const tpl = templates.find((t) => t.id === selectedTemplateId);
+              const hasMount = tpl?.starAttrMap;
+              return (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: T.accent.blue,
+                    background: `${T.accent.blue}15`,
+                    padding: "6px 8px",
+                    borderRadius: 4,
+                  }}
+                >
+                  <div>将复制品质配置、属性池和计算参数</div>
+                  {hasMount && (
+                    <div style={{ marginTop: 2, color: T.accent.green }}>
+                      将自动生成底表并挂载属性
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
